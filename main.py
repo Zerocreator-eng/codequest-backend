@@ -5,7 +5,7 @@ import database
 import os
 
 app = FastAPI(title="Code Quest Backend")
-ADMIN_KEY = "changeme123"  # change this to your own secret before deploying
+ADMIN_KEY = os.environ.get("ADMIN_KEY", "changeme123") # change this to your own secret before deploying
 
 # Allow your itch.io page (and, for now, anything) to call this API.
 # Once deployed, tighten allow_origins to your actual itch.io URL.
