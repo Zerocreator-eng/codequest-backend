@@ -1,45 +1,64 @@
+import os
 import sqlite3
 
-DB_FILE = "leaderboard.db"
+DATABASE_URL = os.environ.get("DATABASE_URL")
+
+if DATABASE_URL:
+    import psycopg
+    PH = "%s"   # Postgres placeholder
+else:
+    PH = "?"    # SQLite placeholder
 
 
 def get_connection():
-    conn = sqlite3.connect(DB_FILE)
-    conn.row_factory = sqlite3.Row  # lets us access columns by name
-    return conn
+    if DATABASE_URL:
+        return psycopg.connect(DATABASE_URL)
+    return sqlite3.connect("leaderboard.db")
 
 
 def init_db():
-    """Creates the scores table if it doesn't exist yet. Safe to call every startup."""
     conn = get_connection()
-    conn.execute("""
-        CREATE TABLE IF NOT EXISTS scores (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            name TEXT NOT NULL,
-            xp INTEGER NOT NULL
-        )
-    """)
+    cur = conn.cursor()
+    if DATABASE_URL:
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS scores (
+                id SERIAL PRIMARY KEY,
+                name TEXT NOT NULL,
+                xp INTEGER NOT NULL
+            )
+        """)
+    else:
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS scores (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                name TEXT NOT NULL,
+                xp INTEGER NOT NULL
+            )
+        """)
     conn.commit()
     conn.close()
 
 
 def save_score(name: str, xp: int):
     conn = get_connection()
-    conn.execute("INSERT INTO scores (name, xp) VALUES (?, ?)", (name, xp))
+    cur = conn.cursor()
+    cur.execute(f"INSERT INTO scores (name, xp) VALUES ({PH}, {PH})", (name, xp))
     conn.commit()
     conn.close()
 
 
 def get_top_scores(limit: int = 10):
     conn = get_connection()
-    rows = conn.execute(
-        "SELECT name, xp FROM scores ORDER BY xp DESC LIMIT ?", (limit,)
-    ).fetchall()
+    cur = conn.cursor()
+    cur.execute(f"SELECT name, xp FROM scores ORDER BY xp DESC LIMIT {PH}", (limit,))
+    rows = cur.fetchall()
     conn.close()
-    return [{"name": row["name"], "xp": row["xp"]} for row in rows]
-    
+    return [{"name": row[0], "xp": row[1]} for row in rows]
+
+
 def clear_scores():
     conn = get_connection()
-    conn.execute("DELETE FROM scores")
+    cur = conn.cursor()
+    cur.execute("DELETE FROM scores")
     conn.commit()
     conn.close()
